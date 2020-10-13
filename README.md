@@ -76,7 +76,7 @@ Client ```10.0.0.4:6640``` - my smartphone (Android 10) that runs ```remramd_cli
 
 ```~/testjail``` is RAM disk mount point
 
-```~/testjail/127.0.0.1:33889``` - local client process jail fake root
+```~/testjail/127.0.0.1:33889``` - local client process' jail 
 
 ```~/testjail/10.0.0.4:6640``` - my smartphone's client jail
 
@@ -86,7 +86,7 @@ Client ```10.0.0.4:6640``` - my smartphone (Android 10) that runs ```remramd_cli
 
 - Server side
 
-Compile the server and the driver by running ```chmod +x build_client.sh && ./build_client.sh```.
+Compile the server and the driver by running ```chmod +x build_server.sh && ./build_server.sh```.
 
 First of all, go to ```driver``` directory and enter ```sudo insmod ramd.ko``` in order to load the driver into the kernel. ```lsblk``` command will show a new device ```/dev/ramd``` which is a given RAM disk. You can provide a size for the disk via setting ```ramd_size``` argument, e.g. ```sudo insmod ramd.ko ramd_size=500``` will create 512 MB RAM disk (disk size is aligned to 2^x bytes). The default capacity is 1 GB.
 
