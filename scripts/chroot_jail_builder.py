@@ -14,11 +14,11 @@ def copy_to_chroot_jail(so_dependencies, cmd_line_args):
         cp_so_deps_cmd += (so + " ")
 
     cp_so_deps_cmd += jail_path
-    stripped_usr_dir_cmd = cp_so_deps_cmd.replace("/usr", "") + " " + jail_path 
+    stripped_usr_dir_cmd = cp_so_deps_cmd.replace("/usr", "") + " " + jail_path + " 2>/dev/null"
     os.system(cp_so_deps_cmd)
     os.system(stripped_usr_dir_cmd)
     for arg_idx in range(2, len(cmd_line_args)):
-        os.system("cp --parents {} {}".format(cmd_line_args[arg_idx], jail_path))
+        os.system("cp --parents {} {} 2>/dev/null".format(cmd_line_args[arg_idx], jail_path))
     if len(jail_path) > 0:
         os.system("rm -rf {}/home".format(jail_path))
 

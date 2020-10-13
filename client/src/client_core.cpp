@@ -108,10 +108,11 @@ uint16_t wait_server_response(uint16_t random_port) {
 void invoke_tcp_listener(const std::string server_ip, uint16_t random_port, char **envp) {
     std::cout << "The server has accepted your connection request! Wait for the remote shell..." << std::endl;
     const std::string random_port_str { std::to_string(random_port) },
-                      nc_flags { server_ip.compare("127.0.0.1") ? "-nvl" : "-nvlp" };
+                      nc_flags { "-nvlp" };
+    // run netcat TCP listener
     const char* const args[] = { "/bin/nc", nc_flags.data(), random_port_str.data(), nullptr };
     execve("/bin/nc", (char* const *)args, envp);
-    std::cerr << "client's execl failed, check if netcat is installed" << std::endl;
+    std::cerr << "client's execve failed, check if netcat is installed" << std::endl;
     exit(EXIT_FAILURE);
 }
 
