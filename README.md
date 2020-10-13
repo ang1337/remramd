@@ -70,9 +70,15 @@ RAM disk implementation via modern block subsystem API using I/O multiqueue.
 
 # Demo
 
-Client 127.0.0.1:33889 - local client process on another terminal tab
+Client ```127.0.0.1:33889``` - local client process on another terminal tab
 
-Client 10.0.0.4:6640 - my smartphone (Android 10) that runs ```remramd_client```
+Client ```10.0.0.4:6640``` - my smartphone (Android 10) that runs ```remramd_client```
+
+```~/testjail``` is RAM disk mount point
+
+```~/testjail/127.0.0.1:33889``` - local client process jail fake root
+
+```~/testjail/10.0.0.4:6640``` - my smartphone's client jail
 
 ![2020-10-14-01-04-46](https://user-images.githubusercontent.com/45107680/95921820-aa77fb00-0dba-11eb-867a-988eab772ddf.gif)
 
