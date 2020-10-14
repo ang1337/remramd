@@ -141,7 +141,7 @@ static blk_status_t process_current_request(struct request *req, unsigned long *
     rq_for_each_segment(bvec, req, riter) {
         data = page_address(bvec.bv_page) + bvec.bv_offset;
         data_len = bvec.bv_len;
-        if (((unsigned long)offset + data_len) < ramd_size) {
+        if (((unsigned long)offset + data_len) <= ramd_size) {
             // write data to the drive
             if (rq_data_dir(req) == WRITE) {
                 memcpy(dev->data + offset, data, data_len);
