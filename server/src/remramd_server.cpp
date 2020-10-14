@@ -202,7 +202,7 @@ void Server::rq_list_pend_conn(ConnectionQueue & conn_queue) const {
 
 // Asks the server to choose an appropriate action to perform
 // arguments: 
-// 1) reference to map of clients (key: client PID, value: ClientMetadata struct)
+// 1) reference to map of clients (key: client IP, value: ClientMetadata struct)
 // return value: pair of map iterator and numeric prompt response (int via enum)
 // 2) pending connections queue
 Server::prompt_response Server::prompt(clients_map_t &clients_map, ConnectionQueue &conn_queue) {
