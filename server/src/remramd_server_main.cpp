@@ -1,13 +1,5 @@
 #include "../include/remramd_server.hpp"
-#include <cstdlib>
-#include <string>
 #include <iostream>
-#include <unistd.h>
-#include <utility>
-#include <stdlib.h>
-#include <cerrno>
-#include <fcntl.h>
-#include <signal.h>
 #include <memory>
 
 int main(int argc, char **argv) {
