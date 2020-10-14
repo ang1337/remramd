@@ -55,7 +55,7 @@ void Server::add_pending_connection(ConnectionQueue &conn_queue) {
     }
 }
 
-// Handles the third prompt option
+// Drops a given client
 // Arguments:
 // 1) reference to map of clients (key: client IP, value: ClientMetadata struct)
 void Server::rq_drop_handler(clients_map_t &clients_map) {
@@ -88,7 +88,7 @@ void Server::send_conn_response(int conn_resp, const PendingClient &pending_conn
     close(resp_sock_fd);
 }
 
-// Handles the second prompt option
+// Connection establishment
 // Arguments:
 // 1) reference to map of clients (key: client IP, value: ClientMetadata struct)
 // 2) Queue of pending connections
@@ -145,7 +145,7 @@ Server::clients_map_iterator Server::rq_conn_handler(clients_map_t &clients_map,
     return new_client_iter_bool_pair.first;
 }
 
-// Handles the first option in prompt
+// Prints out data about all connected clients
 // arguments:
 // 1) reference to map of clients (key: client IP address, value: ClientMetadata struct)
 void Server::rq_info_handler(clients_map_t &clients_map) { 
