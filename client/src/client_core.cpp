@@ -59,9 +59,6 @@ uint16_t send_random_port(const std::string &server_ip, const uint16_t server_po
         std::cerr << "Cannot send random port to the server" << std::endl;
         exit(EXIT_FAILURE);
     }
-    std::string port_string = std::to_string(random_port);
-    char *port_string_arg = new char[port_string.size() + 1];
-    memcpy(port_string_arg, &port_string[0], port_string.size() + 1);
     shutdown(ping_fd, SHUT_RDWR);
     close(ping_fd);
     return random_port;
