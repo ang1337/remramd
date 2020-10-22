@@ -201,7 +201,7 @@ static int setup_ramd_device(void) {
         return -ENOMEM;
     }
     ramd_dev->size = ramd_size;
-    // vmalloc-like functions doesn't demand physically contiguous heap memory from the kernel
+    // vmalloc-like functions don't demand physically contiguous heap memory from the kernel
     // so it is the best option for big in-kernel heap allocations 
     ramd_dev->data = vzalloc(ramd_size);
     if (!ramd_dev->data) {
