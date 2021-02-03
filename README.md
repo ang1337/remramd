@@ -6,40 +6,47 @@ REMote RAM Disk - remotely accessible sandboxed virtual storage device.
 
 ```
 .
-├── build_client.sh
-├── build_server.sh
 ├── client
-│   ├── CMakeLists.txt
-│   ├── include
-│   │   └── client_core.hpp
+│   ├── inc
+│   │   └── Client.hpp
+│   ├── remramd_client
 │   └── src
-│       ├── client_core.cpp
-│       └── remramd_client.cpp
+│       ├── Client.cpp
+│       └── client_main.cpp
 ├── driver
 │   ├── Makefile
 │   └── ramd.c
+├── install_client.sh
+├── install_server.sh
 ├── LICENSE
 ├── README.md
-├── scripts
-│   └── chroot_jail_builder.py
-└── server
-    ├── CMakeLists.txt
-    ├── include
-    │   └── remramd_server.hpp
+├── server
+│   ├── inc
+│   │   ├── PipeWrapper.hpp
+│   │   └── Server.hpp
+│   ├── remramd_server
+│   └── src
+│       ├── PipeWrapper.cpp
+│       ├── Server.cpp
+│       └── server_main.cpp
+└── shared
+    ├── inc
+    │   ├── Connection.hpp
+    │   ├── Protocol.hpp
+    │   ├── remramd_exception.hpp
+    │   └── Utils.hpp
     └── src
-        ├── remramd_server.cpp
-        └── remramd_server_main.cpp
+        ├── Connection.cpp
+        ├── Protocol.cpp
+        ├── remramd_exception.cpp
+        └── Utils.cpp
 ```
 
 ```./driver``` - contains block device driver that represents fully functional RAM disk that uses I/O multiqueue.
 
 ```./client``` - remramd client that gets a remote shell from the server via providing server's IP address and TCP port.
 
-```./server``` - remramd fork server that manages a minimal CLI and client processes
-
-```./build_client.sh``` & ```./build_server.sh``` - client/server compilation scripts, uses CMake behind the scenes. Server compilation script additionally compiles the driver.
-
-```./scripts``` - initially contains chroot jail builder script that builds an individual sandboxed environment for each client.
+```./server``` - remramd fork server that manages a minimal CLI and client processes.
 
 # How it works?
 
@@ -65,10 +72,8 @@ RAM disk implementation using modern block subsystem API - I/O multiqueue.
     
 # Dependencies
 
-- Python 3 
 - Linux kernel version >= 5.0
-- gcc
-- cmake
+- gcc with C++17 support
 - netcat
 
 # Demo
@@ -89,18 +94,18 @@ Client ```10.0.0.4:6640``` - my smartphone (Android 10) that runs ```remramd_cli
 
 - Server side
 
-Compile the server and the driver by running ```chmod +x build_server.sh && ./build_server.sh```.
+Compile the server and the driver by running ```chmod +x install_server.sh && sudo ./install_server.sh```.
 
 First of all, go to ```driver``` directory and enter ```sudo insmod ramd.ko``` in order to load the driver into the kernel. ```lsblk``` command will show a new device ```/dev/ramd``` which is a given RAM disk. You can provide a size for the disk via setting ```ramd_size``` argument, e.g. ```sudo insmod ramd.ko ramd_size=500``` will create 512 MB RAM disk (disk size is aligned to 2^x bytes). Default capacity is 1 GB.
 
 Then you need to create a partition that will be formatted further. ```sudo fdisk /dev/ramd``` to partition the device (go for a default suggestions). ```lsblk``` will show ```/dev/ramd1``` partition. Now the partition needs to be formatted to one of the filesystem formats, let's pick a well-known ```ext4```. Enter ```sudo mkfs -t ext4 /dev/ramd1```. Now, the partition is ready to be mounted anywhere in your filesystem. Create an arbitrary directory and mount the formatted partition on it, e.g. ```mkdir -p ~/jail && sudo mount /dev/ramd1 ~/jail```. Now RAM disk is ready to be used as a separate virtual block device.
 
-In order to run the server, enter ```sudo ./server/build/remramd_server <TCP port to listen for clients> <path to current Python 3 interpreter> <path to chroot jail builder script>```.
+In order to run the server, enter ```sudo ./remramd_server <jail path> <listening TCP port> <backlog>```.
 
-```sudo ./server/build/remramd_server 1337 `which python` ./scripts/chroot_jail_builder.py``` - the server will listen on port 1337.
+Example: ```sudo ./remramd_server /home/user/jail 1337 10``` - the server will listen on TCP port #1337 with a backlog of 10 pending connections. Every client will be jailed at /home/user/jail/<client's IP address> directory.
 
 - Client side
 
-Compile the client by running ```chmod +x build_client.sh && ./build_client.sh```.
+Compile the client by running ```chmod +x install_client.sh && ./install_client.sh```.
 
-You need to know server's IP address and TCP listening port. Usage: ```./client/build/remramd_client <server IP> <port>```.
+You need to know server's IP address and TCP listening port. Usage: ```./remramd_client <server IP> <port>```.
