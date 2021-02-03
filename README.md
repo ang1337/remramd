@@ -6,29 +6,40 @@ REMote RAM Disk - remotely accessible sandboxed virtual storage device.
 
 ```
 .
-├── build_client.sh
-├── build_server.sh
 ├── client
-│   ├── CMakeLists.txt
-│   ├── include
-│   │   └── client_core.hpp
+│   ├── inc
+│   │   └── Client.hpp
+│   ├── remramd_client
 │   └── src
-│       ├── client_core.cpp
-│       └── remramd_client.cpp
+│       ├── Client.cpp
+│       └── client_main.cpp
 ├── driver
 │   ├── Makefile
 │   └── ramd.c
+├── install_client.sh
+├── install_server.sh
 ├── LICENSE
 ├── README.md
-├── scripts
-│   └── chroot_jail_builder.py
-└── server
-    ├── CMakeLists.txt
-    ├── include
-    │   └── remramd_server.hpp
+├── server
+│   ├── inc
+│   │   ├── PipeWrapper.hpp
+│   │   └── Server.hpp
+│   ├── remramd_server
+│   └── src
+│       ├── PipeWrapper.cpp
+│       ├── Server.cpp
+│       └── server_main.cpp
+└── shared
+    ├── inc
+    │   ├── Connection.hpp
+    │   ├── Protocol.hpp
+    │   ├── remramd_exception.hpp
+    │   └── Utils.hpp
     └── src
-        ├── remramd_server.cpp
-        └── remramd_server_main.cpp
+        ├── Connection.cpp
+        ├── Protocol.cpp
+        ├── remramd_exception.cpp
+        └── Utils.cpp
 ```
 
 ```./driver``` - contains block device driver that represents fully functional RAM disk that uses I/O multiqueue.
