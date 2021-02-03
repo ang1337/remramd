@@ -46,11 +46,7 @@ REMote RAM Disk - remotely accessible sandboxed virtual storage device.
 
 ```./client``` - remramd client that gets a remote shell from the server via providing server's IP address and TCP port.
 
-```./server``` - remramd fork server that manages a minimal CLI and client processes
-
-```./build_client.sh``` & ```./build_server.sh``` - client/server compilation scripts, uses CMake behind the scenes. Server compilation script additionally compiles the driver.
-
-```./scripts``` - initially contains chroot jail builder script that builds an individual sandboxed environment for each client.
+```./server``` - remramd fork server that manages a minimal CLI and client processes.
 
 # How it works?
 
