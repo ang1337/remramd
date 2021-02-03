@@ -9,7 +9,6 @@ REMote RAM Disk - remotely accessible sandboxed virtual storage device.
 ├── client
 │   ├── inc
 │   │   └── Client.hpp
-│   ├── remramd_client
 │   └── src
 │       ├── Client.cpp
 │       └── client_main.cpp
@@ -24,7 +23,6 @@ REMote RAM Disk - remotely accessible sandboxed virtual storage device.
 │   ├── inc
 │   │   ├── PipeWrapper.hpp
 │   │   └── Server.hpp
-│   ├── remramd_server
 │   └── src
 │       ├── PipeWrapper.cpp
 │       ├── Server.cpp
@@ -40,6 +38,7 @@ REMote RAM Disk - remotely accessible sandboxed virtual storage device.
         ├── Protocol.cpp
         ├── remramd_exception.cpp
         └── Utils.cpp
+
 ```
 
 ```./driver``` - contains block device driver that represents fully functional RAM disk that uses I/O multiqueue.
