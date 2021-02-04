@@ -13,9 +13,6 @@
 namespace remramd {
     namespace internal {
         class Protocol {
-            private:
-                static void validate_timeout(int &timeout);
-                static const std::pair<int, std::uint16_t> init_reverse_shell_server(int timeout);
             public:
                 // client request code == reverse shell port
                 using ClientRequest = std::uint16_t;
@@ -49,6 +46,8 @@ namespace remramd {
                     CHILD_FAILED,
                     CHILD_SUCCESS
                 };
+            
+                static void validate_timeout(int &timeout);
 
                 template <typename T>
                 static void send_data(const Protocol::ClientData &pend_conn, const T &data);
