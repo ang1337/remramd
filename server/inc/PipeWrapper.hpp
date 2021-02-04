@@ -26,7 +26,6 @@ namespace remramd {
                 ~PipeWrapper();
 
                 void close_pipe_end(const Action &io_action); // V
-                int get_pipe_fd(const Action &io_action) const;
 
                 template <typename T>
                 void write(const T data) const;

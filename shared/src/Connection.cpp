@@ -7,10 +7,16 @@
 #include <functional>
 
 namespace remramd {
+    namespace internal {
         Connection::~Connection() {
             close(sock_fd);
         }
 
+        // connects the given client via reverse shell inside of its chroot jail
+        // args:
+        // @ target_ip - client's IP address
+        // @ target_port - client's reverse shell port 
+        // @ pipe - pipe for child-parent communication
         void Connection::connect(const std::string &target_ip, const std::uint16_t target_port, internal::PipeWrapper &pipe) {
             sock_fd = socket(AF_INET, SOCK_STREAM, 0);
             
@@ -28,19 +34,21 @@ namespace remramd {
                 throw exception("Failed to connect");
             }
 
-            //if (this->server_side) {
-                dup2(sock_fd, fileno(stdin));
-                dup2(sock_fd, fileno(stdout));
-                dup2(sock_fd, fileno(stderr));
-                pipe.write(internal::Protocol::PipeResponse::CHILD_SUCCESS);
-                execl("/bin/bash", "/bin/bash", "-i", nullptr);
-           // }
+            dup2(sock_fd, fileno(stdin));
+            dup2(sock_fd, fileno(stdout));
+            dup2(sock_fd, fileno(stderr));
+            pipe.write(internal::Protocol::PipeResponse::CHILD_SUCCESS);
+            execl("/bin/bash", "/bin/bash", "-i", nullptr);
 
         }
-        // server-side constructor for reverse shell connection preparation
+
+        // prepares the built jail for a given client and invokes the final reverse shell connection routine
+        // args:
+        // @ new_clients - client to be jailed and connected
+        // @ pipe - child-parent communication channel
+        // @ server_instance - current Server object
         Connection::Connection(const internal::Protocol::ClientData &new_client, 
-                               internal::PipeWrapper &pipe, 
-                               Server &server_instance) : server_side(true) {
+                               internal::PipeWrapper &pipe) {
 
             const std::string chown_cmd {
                 "chown -R " + std::to_string(new_client.uid) + ':'
@@ -55,28 +63,22 @@ namespace remramd {
                 throw exception("Cannot change the current directory to the client's fakeroot");
             }
 
+            // chroot into the client's jail
             if (chroot(new_client.fakeroot_path.c_str())) {
                 throw exception("Failed to chroot into the client's jail");
             }
 
+            // drop privileges
             if (setgid(new_client.gid) || setuid(new_client.uid)) {
                 throw exception("Cannot drop client's permissions for the given chroot jail");
             }
 
+            // set env var to the in-jail /bin directory
             char env[] = "PATH=/bin";
             putenv(env);
 
             this->connect(new_client.ip, new_client.reverse_shell_port, pipe);
         }
 
-        int Connection::get_sock_fd() const noexcept {
-            return sock_fd;
-        }
-
-        /*std::optional<std::reference_wrapper<Protocol::ClientData>> Connection::get_connected_client() noexcept {
-            if (server_side) {
-                return std::ref(connected_client);
-            }
-            return {};
-        }*/
+    }
 }

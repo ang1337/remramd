@@ -6,6 +6,9 @@
 
 namespace remramd {
     namespace internal {
+        // reads an output of ldd program
+        // args:
+        // @ exposed_program - program to be parsed via ldd
         const std::vector<std::string> Utils::dump_ldd_output(const std::string &exposed_program) {
             FILE* fp { popen(("ldd " + exposed_program).c_str(), "r") };
             if (!fp) {
@@ -38,6 +41,10 @@ namespace remramd {
             return formatted_ldd_output;
         }
 
+        // parses all shared objects dependencies of a given binary
+        // args:
+        // @ exposed_program - binary to parse
+        // return value: vector of parsed ldd data about a given binary
         std::vector<Utils::ldd_output_data> Utils::parse_so_dependencies(const std::string &exposed_program) {
             const auto ldd_output { dump_ldd_output(exposed_program) };
             // parse the given full ldd output of the given exposed program
@@ -65,6 +72,11 @@ namespace remramd {
             return so_dep_paths;
         }
 
+        // populates the given client jail with all required binaries and its dependencies
+        // args:
+        // @ new_client - client to be jailed
+        // @ jail_path - jail mount point of all jailed clients
+        // return value: current client's jail path (fake root for chroot jail)
         const std::string Utils::populate_client_jail(const Protocol::ClientData &new_client, const std::string &jail_path) {
             const std::string curr_client_fakeroot_path { jail_path + '/' + new_client.ip };
 

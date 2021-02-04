@@ -3,6 +3,7 @@
 #include "../../shared/inc/Connection.hpp"
 #include "../inc/PipeWrapper.hpp"
 #include <filesystem>
+#include <type_traits>
 #include <csignal>
 #include <thread>
 #include <iostream>
@@ -16,8 +17,11 @@
 #include <cstring>
 
 namespace remramd {
-    // Server ctor builds a chroot jail for further connections
-    Server::Server(std::string chroot_jail_path, 
+    // ctor args:
+    // @ chroot_jail_path - chroot jail path for all clients
+    // @ server_port - server's TCP port
+    // @ queued_conn_num - backlog of queued pending connections
+    Server::Server(const std::string chroot_jail_path, 
                    const std::uint16_t server_port, 
                    const unsigned queued_conn_num)
         : jail_path(std::move(chroot_jail_path)),
@@ -26,6 +30,7 @@ namespace remramd {
           server_is_on(true),
           conn_recv_worker_is_on(false) {
 
+        // server must be run as root
         if (getuid()) {
             throw exception("Server needs to be run as root");
         }
@@ -34,17 +39,14 @@ namespace remramd {
             throw exception("Chroot jail path is empty");
         }
 
-        std::filesystem::create_directory(jail_path);
-
+        // creates jail path for all further clients
         if (!std::filesystem::exists(jail_path)) {
-            throw exception("Cannot create chroot jail directory");
+            std::filesystem::create_directory(jail_path);
         }
-
     }
 
     Server::~Server() {
         drop_all_clients();
-        // but before that drop all clients
         erase_jail_dir();
     }
 
@@ -53,6 +55,10 @@ namespace remramd {
         return os;
     }
 
+    // prints clients map
+    // args:
+    // @ os - output stream
+    // @ clients_map - map of all currently jailed clients
     std::ostream& operator << (std::ostream &os, Server::clients_map_t &clients_map) {
         unsigned long clients_cnt {};
 
@@ -60,6 +66,7 @@ namespace remramd {
 
         while (c_map_iter != clients_map.cend()) {
             auto tmp_map_iter { c_map_iter };
+
             if (!kill(c_map_iter->second.pid, 0)) {
                 os << ++clients_cnt << ") IP: " << c_map_iter->first << '\n'
                    << "Reverse shell port: " << c_map_iter->second.reverse_shell_port << '\n'
@@ -79,17 +86,31 @@ namespace remramd {
                 c_map_iter++;
                 clients_map.erase(tmp_map_iter);
             }
+
         }
 
         return os;
     }
 
+    // cleans the jail path from all former clients' jail directories
     void Server::erase_jail_dir() {
-        if (std::filesystem::exists(jail_path)) {
-            std::filesystem::remove_all(jail_path);
+        for (auto &fs_iter : std::filesystem::directory_iterator(jail_path)) {
+            std::filesystem::remove_all(fs_iter);
         }
     }
 
+    // allows to input enum class related to prompt choice
+    // args:
+    // @ ss - current stringstream 
+    // @ p_choice - enum class related to prompt choice
+    std::stringstream& operator >> (std::stringstream &ss, Server::PromptChoice &p_choice) {
+        std::underlying_type_t<Server::PromptChoice> val {};
+        ss >> val;
+        p_choice = static_cast<Server::PromptChoice>(val);
+        return ss;
+    }
+
+    // this thread receives new connection requests
     void Server::connection_receiver_worker() {
         auto init_server = [this]() -> int {
             int server_fd { socket(AF_INET, SOCK_STREAM, 0) };
@@ -132,10 +153,12 @@ namespace remramd {
             auto curr_pend_conn { internal::Protocol::wait_new_connection_request(server_fd, 10) };
 
             if (curr_pend_conn.has_value()) {
+                // reads connection request payload (= reverse shell TCP port)
                 auto reverse_shell_port { internal::Protocol::receive_data<internal::Protocol::ClientRequest>(*curr_pend_conn) };
 
                 if (reverse_shell_port.has_value()) {
                     curr_pend_conn->reverse_shell_port = ntohs(*reverse_shell_port);
+                    // add the given pending connection to the queue
                     std::lock_guard<std::mutex> lock(pend_conn_q_mut);
                     conn_q.push(std::move(*curr_pend_conn));
                 }
@@ -147,6 +170,7 @@ namespace remramd {
         close(server_fd);
     }
 
+    // shows current pending connection
     void Server::show_pending_connection() {
         pend_conn_q_mut.lock();
         if (conn_q.size()) {
@@ -160,6 +184,7 @@ namespace remramd {
         pend_conn_q_mut.unlock();
     }
 
+    // fetches current pending connections from the queue
     std::optional<internal::Protocol::ClientData> Server::obtain_pending_connection() {
         std::lock_guard<std::mutex> lock(pend_conn_q_mut);
         if (conn_q.size()) {
@@ -170,6 +195,7 @@ namespace remramd {
         return {};
     }
 
+    // displays currently jailed clients
     void Server::display_current_clients() {
         clients_map_mut.lock();
         unsigned long client_cnt {};
@@ -184,12 +210,16 @@ namespace remramd {
         clients_map_mut.unlock();
     }
 
+    // enjails current pending connection
+    // args:
+    // @ new_client - pending connection to be jailed and turned into the new client
+    // @ pipe - pipe for communication with parent (server) process
     void Server::enjail_new_client(internal::Protocol::ClientData &new_client, 
                                    internal::PipeWrapper &pipe) {
 
         try {
 
-            Connection conn_obj(new_client, pipe, *this);
+            internal::Connection conn_obj(new_client, pipe);
 
         } catch (const exception &e) {
             std::cerr << e.what() << std::endl;
@@ -198,9 +228,13 @@ namespace remramd {
         }
     }
 
+    // adds new client, forking it off to the separate process with different permissions
+    // args:
+    // @ new_client - connection to be accepted and jailed
     void Server::add_new_client(internal::Protocol::ClientData &&new_client) {
         internal::PipeWrapper pipe {};
 
+        // ClientData struct data needs to be complemented with additional metadata (uid, gid and exposed binaries list)
         std::cout << "New client | IP: " << new_client.ip << std::endl;
         internal::Utils::process_input<uid_t>(new_client.uid, "UID: ");
         internal::Utils::process_input<gid_t>(new_client.gid, "GID: ");
@@ -217,29 +251,31 @@ namespace remramd {
             }
         }
 
+        // fill the current client's jail with all required binaries and its dependencies
         new_client.fakeroot_path = internal::Utils::populate_client_jail(new_client, jail_path);
 
+        // forks out a new client 
         pid_t child_pid { fork() };
 
         switch (child_pid) {
             case -1:
                 throw exception("Fork failed");
             case 0: // child process
-                // close parent -> child write 
                 pipe.close_pipe_end(internal::PipeWrapper::Action::READ);
-                // close child -> parent read
                 enjail_new_client(new_client, pipe);
                 break;
             default: { // parent process
+                // prevents zombie processes after SIGKILL
                 std::signal(SIGCHLD,SIG_IGN);
                 pipe.close_pipe_end(internal::PipeWrapper::Action::WRITE);
                 // wait for a response 
                 const auto child_response { pipe.read<internal::Protocol::PipeResponse>() }; 
-                // sleep for 1.5 seconds to be sure that execve actually has been invoked
+                // sleep for 1.5 seconds to be sure that execve actually has been successful
                 std::this_thread::sleep_for(std::chrono::milliseconds(1500));
-                // check if process is aliove (will fail if execve in child process failed)
+                // check if process is alive (will fail if execve in child process failed)
                 if (!kill(child_pid, 0) && child_response == internal::Protocol::PipeResponse::CHILD_SUCCESS) {
                     new_client.pid = child_pid;
+                    // adds a new successfully connected client to the clients map
                     std::lock_guard<std::mutex> lock(clients_map_mut);
                     c_map[new_client.ip] = std::move(new_client);
                 } else {
@@ -252,12 +288,16 @@ namespace remramd {
         }
     }
 
+    // handle current connection according to the request
+    // args:
+    // @ accept - decision flag. If true - accept, else decline the current pending connection
     void Server::handle_pending_connection(const bool accept) {
         auto pend_conn { obtain_pending_connection() };
         if (pend_conn.has_value()) {
             // if the pending connection should be accepted
             if (accept) {
                 clients_map_mut.lock();
+                // check if such client already connected to the server
                 if (c_map.find(pend_conn->ip) != c_map.end()) {
                     clients_map_mut.unlock();
                     std::cerr << "Client with IP " << pend_conn->ip << " is already connected\n";
@@ -265,6 +305,7 @@ namespace remramd {
                     return;
                 }
                 clients_map_mut.unlock();
+                // send approval to the client
                 internal::Protocol::send_data(*pend_conn, internal::Protocol::ServerResponse::YEP);
                 add_new_client(std::move(*pend_conn));
             } else { // if the pending connection should be declined
@@ -277,6 +318,7 @@ namespace remramd {
         }
     }
 
+    // drops all pending connections
     void Server::decline_all_pending_connections() {
         std::lock_guard<std::mutex> lock(pend_conn_q_mut);
         while (!conn_q.empty()) {
@@ -286,15 +328,19 @@ namespace remramd {
         }
     }
 
+    // drops specific jailed client
     void Server::drop_specific_client() {
         display_current_clients();
+
         clients_map_mut.lock();
+
         if (c_map.size()) {
             clients_map_mut.unlock();
             std::string ip_addr {};
             internal::Utils::process_input<std::string>(ip_addr, "Enter the client's IP address: ");
             clients_map_mut.lock();
             clients_map_t::const_iterator found_client_iter { c_map.find(ip_addr) };
+
             if (found_client_iter != c_map.cend()) {
                 close(found_client_iter->second.reverse_shell_port);
                 kill(found_client_iter->second.pid, SIGKILL);
@@ -306,12 +352,16 @@ namespace remramd {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1500));
                 return; // prevents possible mutex double unlock
             }
+
         }
+
         clients_map_mut.unlock();
     }
 
+    // drops all jailed clients
     void Server::drop_all_clients() {
         clients_map_mut.lock();
+
         if (c_map.size()) {
             auto map_iter { c_map.cbegin() };
             while (map_iter != c_map.cend()) {
@@ -332,62 +382,70 @@ namespace remramd {
             std::this_thread::sleep_for(std::chrono::milliseconds(1500));
             return;
         }
+
         clients_map_mut.unlock();
     }
 
+    // runs the entire server
     void Server::run() {
         // disable stdout buffering
         std::setvbuf(stdout, NULL, _IONBF, 0);
 
         conn_recv_worker_is_on.store(true);
 
+        // invoke connection receiver thread
         std::thread conn_work_t(&Server::connection_receiver_worker, this);
         conn_work_t.detach();
 
+        // every 30 seconds this thread checks if any client has disconnected. If yes, cleans up the jail of all disconnected clients
         std::thread dir_sweeper_thread([this] {
+
             for (;;) {
                 {
                     std::lock_guard<std::mutex> lock(clients_map_mut);
+
                     for (const auto &client : c_map) {
                         if (kill(client.second.pid, 0)) {
                             close(client.second.reverse_shell_port);
                             std::filesystem::remove_all(client.second.fakeroot_path);
                         }
                     }
+
                 }
                 std::this_thread::sleep_for(std::chrono::seconds(30));
             }
+
         });
 
         dir_sweeper_thread.detach();
 
         while (server_is_on.load() && conn_recv_worker_is_on.load()) {
-            unsigned choice {};
-            internal::Utils::process_input<unsigned>(choice, internal::Utils::menu_msg);
+            PromptChoice choice {};
+            internal::Utils::process_input<PromptChoice>(choice, internal::Utils::menu_msg);
 
             switch (choice) {
-                case 1://PromptChoice::SHOW_PEND_CONN: 
-                    show_pending_connection(); // V
+                case PromptChoice::SHOW_PEND_CONN: 
+                    show_pending_connection(); 
                     break;
-                case 2://PromptChoice::SHOW_CURR_CLIENTS:
-                    display_current_clients(); // V
+                case PromptChoice::SHOW_CURR_CLIENTS:
+                    display_current_clients(); 
                     break;
-                case 3://PromptChoice::ACCEPT_PEND_CONN:
-                    handle_pending_connection(true); // VX
+                case PromptChoice::ACCEPT_PEND_CONN:
+                    handle_pending_connection(true); 
                     break;
-                case 4://PromptChoice::DECLINE_PEND_CONN:
+                case PromptChoice::DECLINE_PEND_CONN:
                     handle_pending_connection(false);
                     break;
-                case 5://PromptChoice::DECLINE_ALL_CURR_CONN:
+                case PromptChoice::DECLINE_ALL_CURR_CONN:
                     decline_all_pending_connections();
                     break;
-                case 6://PromptChoice::DROP_SPECIFIC_CLIENT:
+                case PromptChoice::DROP_SPECIFIC_CLIENT:
                     drop_specific_client();
                     break;
-                case 7://PromptChoice::DROP_ALL_CLIENTS:
+                case PromptChoice::DROP_ALL_CLIENTS:
                     drop_all_clients();
                     break;
-                case 8://PromptChoice::EXIT:
+                case PromptChoice::EXIT:
                     server_is_on.store(false);
                     conn_recv_worker_is_on.store(false);
                     break;

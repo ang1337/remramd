@@ -14,6 +14,7 @@
 
 namespace remramd {
     namespace internal {
+        // ClientData ctor, populates the object with default binaries that are exposed to all new clients
         Protocol::ClientData::ClientData() {
             exposed_binaries.push_back("/bin/bash");
             exposed_binaries.push_back("/bin/cp");
@@ -22,34 +23,7 @@ namespace remramd {
             exposed_binaries.push_back("/bin/cat");
         }
 
-        std::optional<Protocol::ClientResponse> Protocol::accept_new_client(int fd, int timeout) {
-            validate_timeout(timeout);
-
-            struct pollfd pfds[1] {}; 
-            pfds[0].fd = fd;
-            pfds[0].events = POLLIN;
-            ServerResponse positive_response { ServerResponse::YEP };
-
-            write(fd, &positive_response, sizeof(positive_response));
-
-            int event_num { poll(pfds, 1, timeout) };
-
-            if (!event_num) {
-                // timeout
-                return ClientResponse::C_TIMEOUT;
-            } 
-
-            int pollin_happened { pfds[0].revents & POLLIN };
-
-            if (pollin_happened) {
-                ClientResponse response {};
-                read(fd, &response, sizeof(response));
-                return response;
-            }
-
-            return {};
-        }
-
+        // validates and converts a timeout value from seconds to milliseconds
         void Protocol::validate_timeout(int &timeout) {
             if (!timeout || timeout == -1) return;
 
@@ -66,6 +40,8 @@ namespace remramd {
             timeout *= 1000; // from seconds to milliseconds
         }
 
+        // waits for new clients
+        // return value: optional ClientData object
         std::optional<Protocol::ClientData> Protocol::wait_new_connection_request(int server_sock_fd, int client_response_timeout) {
                 struct sockaddr_in client_addr {};
                 unsigned client_addr_len { sizeof(client_addr) };
@@ -107,6 +83,8 @@ namespace remramd {
                 return curr_pend_conn;
         }
 
+        // requests a connection from a given server
+        // return value: Client request (= reverse shell port on a client side)
         const Protocol::ClientRequest Protocol::request_connection(const std::string &server_ip, const std::uint16_t server_port) {
             auto get_rand_port = []() -> ClientRequest {
                 static constexpr std::uint16_t port_rng_start { 1024 },

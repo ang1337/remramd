@@ -1,6 +1,8 @@
 #pragma once
 #include "Protocol.hpp"
+#include "../../server/inc/Server.hpp"
 #include <string>
+#include <type_traits>
 #include <sstream>
 #include <iostream>
 #include <vector>
@@ -28,11 +30,16 @@ namespace remramd {
                 // first - library, second - directory where the library resides
                 using ldd_output_data = std::pair<std::string, std::string>;
 
+                // generic input handling routine
+                // args:
+                // @ input_var - variable to read data into
+                // @ msg - message to be printed as a part of a prompt (optional)
                 template <typename InputType>
                 static void process_input(InputType &input_var, const std::string &msg = "") {
                     if (msg.size()) {
                         std::cout << msg;
                     }
+
                     std::string input_str_container {};
                     std::getline(std::cin, input_str_container);
                     std::stringstream ss(input_str_container);

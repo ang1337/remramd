@@ -5,6 +5,7 @@
 
 namespace remramd {
     namespace internal {
+        // PipeWrapper ctor, initialized a file descriptor context bitmap and opens a pipe
         PipeWrapper::PipeWrapper() : fd_ctx_bitmap(11) {
             if (pipe(pipe_fds)) {
                 throw exception("Cannot create parent_to_child pipe");
@@ -16,15 +17,10 @@ namespace remramd {
             close(pipe_fds[1]);
         }
 
-        int PipeWrapper::get_pipe_fd(const Action &io_action) const {
-            if (validate_requested_fd(io_action)) {
-                return io_action == Action::READ ? pipe_fds[0] : pipe_fds[1]; 
-            } 
-
-            throw exception("Invalid pipe file descriptor");
-        }
-
-        void PipeWrapper::close_pipe_end(const Action &io_action) { // V
+        // closes a given pipe end and alters the file descriptor context bitmap accordingly
+        // args:
+        // @ io_action - read or write pipe end identifier
+        void PipeWrapper::close_pipe_end(const Action &io_action) { 
             if (io_action == Action::READ) {
                 close(pipe_fds[0]);
                 fd_ctx_bitmap &= ~(1 << CtxBitPos::READ_END);
@@ -34,6 +30,7 @@ namespace remramd {
             }
         }
 
+        // validates the given file descriptor, returns FALSE if it's closed 
         const bool PipeWrapper::validate_requested_fd(const Action &io_action) const {
             if (fd_ctx_bitmap == 11) {
                 throw exception("Close the unnecessary pipe side before usage");
